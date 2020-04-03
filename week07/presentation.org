@@ -42,24 +42,33 @@ license, unless otherwise noted.
 
 #+BEGIN_SRC elisp
 ;; I need this for org-mode to work well
-
-;(require 'ob-sh)
-(require 'ob-shell)
-; (org-babel-do-load-languages 'org-babel-load-languages '((sh . t)))
-(org-babel-do-load-languages 'org-babel-load-languages '((shell . t)))
+;; If we have a new org-mode use ob-shell
+;; otherwise use ob-sh --- but not both!
+(if (require 'ob-shell nil 'noerror)
+  (progn
+    (org-babel-do-load-languages 'org-babel-load-languages '((shell . t))))
+  (progn
+    (require 'ob-sh)
+    (org-babel-do-load-languages 'org-babel-load-languages '((sh . t)))))
 (org-babel-do-load-languages 'org-babel-load-languages '((C . t)))
 (org-babel-do-load-languages 'org-babel-load-languages '((python . t)))
 (setq org-src-fontify-natively t)
 (setq org-confirm-babel-evaluate nil) ;; danger!
 (custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
  '(org-block ((t (:inherit shadow :foreground "black")))))
 #+END_SRC
 
 #+RESULTS:
+
+*** Org export
+#+BEGIN_SRC elisp
+(org-html-export-to-html)
+(org-latex-export-to-pdf)
+(org-ascii-export-to-ascii)
+#+END_SRC
+
+#+RESULTS:
+: presentation.txt
 
 ** Org Template
 Copy and paste this to demo C

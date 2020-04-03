@@ -1,0 +1,2365 @@
+#+TITLE: CMPUT201W20B2 Week 10
+#+PROPERTY: header-args:C             :exports both :flags -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 :eval yes :results value verbatim
+#+PROPERTY: header-args:sh            :exports both :eval yes :results value verbatim
+#+PROPERTY: header-args:shell         :exports both :eval yes :results value verbatim
+
+* Week10
+** Copyright Statement
+
+If you are in CMPUT201 at UAlberta this code is released in the public
+domain to you.
+
+Otherwise it is (c) 2020 Abram Hindle, Hazel Campbell AGPL3.0+
+
+*** License
+
+    CMPUT 201 C Notes
+    Copyright (C) 2020 Abram Hindle, Hazel Campbell
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+*** Hazel Code is licensed under AGPL3.0+
+
+Hazel's code is also found here
+https://github.com/hazelybell/examples/tree/C-2020-01
+
+Hazel code is licensed: The example code is licensed under the AGPL3+
+license, unless otherwise noted.
+
+** Alternative version
+
+Checkout the .txt, the .pdf, and the .html version
+
+** Init ORG-MODE
+
+#+BEGIN_SRC elisp
+;; I need this for org-mode to work well
+;; If we have a new org-mode use ob-shell
+;; otherwise use ob-sh --- but not both!
+(if (require 'ob-shell nil 'noerror)
+  (progn
+    (org-babel-do-load-languages 'org-babel-load-languages '((shell . t))))
+  (progn
+    (require 'ob-sh)
+    (org-babel-do-load-languages 'org-babel-load-languages '((sh . t)))))
+(org-babel-do-load-languages 'org-babel-load-languages '((C . t)))
+(org-babel-do-load-languages 'org-babel-load-languages '((python . t)))
+(setq org-src-fontify-natively t)
+(setq org-confirm-babel-evaluate nil) ;; danger!
+(custom-set-faces
+ '(org-block ((t (:inherit shadow :foreground "black"))))
+ '(org-code ((t (:inherit shadow :foreground "black")))))
+#+END_SRC
+
+#+RESULTS:
+
+*** Org export
+#+BEGIN_SRC elisp
+(org-html-export-to-html)
+(org-latex-export-to-pdf)
+(org-ascii-export-to-ascii)
+#+END_SRC
+
+#+RESULTS:
+: presentation.txt
+
+
+*** Org Template
+Copy and paste this to demo C
+
+#+BEGIN_SRC C :exports both
+#include <stdio.h>
+
+int main(int argc, char**argv) {
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+** Remember how to compile?
+
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -o programname programname.c
+
+** Preprocessor stuff like if-def
+   The preprocessor deals with all the lines that you start with an
+   octalthrope or hash mark: #
+  
+   The preprocessor lets you define symbols, macros, and include
+   files.
+
+*** Multiple Files?
+
+How does stdio.h work?
+
+file:/usr/include/stdio.h
+
+It defines definitions, macros, and prototypes for the stdio library.
+The linker will link your executable to that library that was already
+compiled.
+
+.h files help us organize C programs by including definitions for the
+object files and libraries that we will create.
+
+Libc or glibc contains the implemention of those definitions.
+libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f919f994000)
+
+libc is composed of many .c files compiled into .o object files and
+then combined into a library. A library is like an executable that
+other executables rely on for code. malloc is defined in malloc.c and
+has a malloc.h file!
+
+Typically if I make a library I will make a .h file so the definitions
+can be shared with other .c files. But the implementation of the functions
+will go into a .c file that includes that .h as well.
+
+- main.c
+  - #include <stdio.h>
+  - #include "library.h"
+  - relies on library.o 
+- library.c
+  - #include "library.h"
+  - makes library.o
+- library.h
+  - defines functions and definitions from library.c
+
+*** Example 
+
+This is a useful function to check if scanf read 1 or more elements
+and didn't read EOF.
+
+file:./checkinput.c
+
+#+BEGIN_SRC C :exports both :tangle checkinput.c :main no
+#include "checkinput.h"
+#include <stdio.h>
+#include <stdlib.h>
+/* checkInput: given the result of scanf check if it 
+ * 0 elements read or EOF. If so exit(1) with a warning.
+ *
+ */
+void checkInput(int err) {
+  if (!err || err == EOF) {
+    printf("\nInvalid input!\n");
+    exit(1);
+  }
+}
+#+END_SRC 
+
+#+RESULTS:
+
+file:./checkinput.h
+
+#+BEGIN_SRC C :exports both :tangle checkinput.h :main no
+// Have a guard to ensure that we don't include it multiple times.
+#ifndef _CHECKINPUT_H_
+/* checkInput: given the result of scanf check if it 
+ * 0 elements read or EOF. If so exit(1) with a warning.
+ *
+ */
+#define _CHECKINPUT_H_
+void checkInput(int err); // a prototype!
+#endif
+#+END_SRC 
+
+#+RESULTS:
+
+file:./checkinput-driver.c
+
+#+BEGIN_SRC C :exports both :tangle checkinput-driver.c
+#include "checkinput.h"
+#include <stdio.h>
+#include "checkinput.h"
+#include "checkinput.h"
+#include "checkinput.h"
+#include "checkinput.h"
+
+// void checkInput(int err); // a prototype!
+
+
+int main() {
+  int input;
+  checkInput(scanf("%d", &input));  
+  puts("Good Input!");
+}
+#+END_SRC 
+
+#+RESULTS:
+
+**** Compiling Multiple Files Easy Mode
+
+We can put all our .c files on the same line and compile them all at
+once! This is handy. But quite limiting.
+
+We can't parallel compile. We can't use all our cores. We can't
+interupt compilation.
+
+#+BEGIN_SRC sh :exports both :tangle build-checkinput-easy.sh
+# build checkinput-driver
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o checkinput-driver checkinput-driver.c && \
+( echo YES | ./checkinput-driver  || \
+  echo 100 | ./checkinput-driver )
+#+END_SRC
+
+#+RESULTS:
+
+BOTH FILES
+
+#+BEGIN_SRC sh :exports both :tangle build-checkinput-easy.sh
+# build checkinput-driver
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o checkinput-driver checkinput-driver.c \
+       checkinput.c && \
+( echo YES | ./checkinput-driver  || \
+  echo 100 | ./checkinput-driver )
+#+END_SRC
+
+#+RESULTS:
+: 
+: Invalid input!
+: Good Input!
+
+
+**** Compiling Multiple Files with Linking
+
+OK now we compile it. The main is the last to compile and it needs all
+the .o files.
+
+All the .c files that don't contain main need to be compiled to object
+files. Use the -c flags to do this.
+
+#+BEGIN_SRC sh :exports both :tangle build-checkinput.sh
+# build checkinput.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -c checkinput.c
+file checkinput.o
+# build checkinput-driver and link it to checkinput.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -c checkinput-driver.c
+file checkinput-driver.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o checkinput-driver checkinput-driver.o \
+       checkinput.o
+file checkinput-driver
+#+END_SRC
+
+#+RESULTS:
+: checkinput.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), with debug_info, not stripped
+: checkinput-driver.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), with debug_info, not stripped
+: checkinput-driver: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/l, for GNU/Linux 3.2.0, BuildID[sha1]=a0d9427bff4f04c1475aa889bce881e4a5b7fb31, with debug_info, not stripped
+
+- If you want some translation :-)
+  - ELF - Executable and Linking format
+  - relocatable - you can link it
+  - shared object - relocatable and executable
+  - LSB - little endian/least significant bit
+  - x86-64 - 64 bit x86 processor
+  - version 1 (SYSV) - version 1 of ELF System V Unix spec.
+
+Test drive it
+
+#+BEGIN_SRC sh :exports both
+echo    | ./checkinput-driver # bad
+echo X  | ./checkinput-driver # bad
+echo 1  | ./checkinput-driver # good
+echo -1 | ./checkinput-driver # good
+#+END_SRC
+
+#+RESULTS:
+: 
+: Invalid input!
+: 
+: Invalid input!
+: Good Input!
+: Good Input!
+
+Now let's see how it is linked!
+
+#+BEGIN_SRC sh :exports both
+ls -l ./checkinput-driver
+ls -l /lib/x86_64-linux-gnu/libc-2.27.so
+ldd ./checkinput-driver
+#+END_SRC
+
+#+RESULTS:
+: -rwxrwxr-x 1 hindle1 hindle1 38472 Mar 17 13:00 ./checkinput-driver
+: -rwxr-xr-x 1 root root 2030544 Apr 16  2018 /lib/x86_64-linux-gnu/libc-2.27.so
+: 	linux-vdso.so.1 (0x00007fff1efef000)
+: 	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007efd65522000)
+: 	/lib64/ld-linux-x86-64.so.2 (0x00007efd65b15000)
+
+- syscalls (read, write, gettimeofday) and libc (libc is stuff like stdio.h)
+
+*** Linking to libraries
+
+`math.h` includes fun functions like cos and tanh.
+
+Math.h, part of the C stdlib, is distributed as a seperate library.
+Not all computers have floating point numbers so why bother compiling
+floating code for them?
+
+file:/usr/include/math.h
+
+#+BEGIN_SRC sh :exports none
+gnome-terminal --window-with-profile Big \
+               -- man math.h
+#+END_SRC
+
+#+RESULTS:
+
+I add the flag -lm so we get our math library :-)
+#+begin_src C :libs -lm :tangle poor-tanh-example.c :exports both
+#include <stdio.h>
+#include <math.h>
+
+int main() {
+    double x = 0.0;
+    double th = tanh(x);
+    double lh = th;
+    do {
+        lh = th;
+        x += 0.5;
+        th = tanh(x);
+        printf("tanh(%e) == %e\n", x, th);
+    } while( lh != th );
+}
+#+end_src
+
+#+RESULTS:
+#+begin_example
+tanh(5.000000e-01) == 4.621172e-01
+tanh(1.000000e+00) == 7.615942e-01
+tanh(1.500000e+00) == 9.051483e-01
+tanh(2.000000e+00) == 9.640276e-01
+tanh(2.500000e+00) == 9.866143e-01
+tanh(3.000000e+00) == 9.950548e-01
+tanh(3.500000e+00) == 9.981779e-01
+tanh(4.000000e+00) == 9.993293e-01
+tanh(4.500000e+00) == 9.997532e-01
+tanh(5.000000e+00) == 9.999092e-01
+tanh(5.500000e+00) == 9.999666e-01
+tanh(6.000000e+00) == 9.999877e-01
+tanh(6.500000e+00) == 9.999955e-01
+tanh(7.000000e+00) == 9.999983e-01
+tanh(7.500000e+00) == 9.999994e-01
+tanh(8.000000e+00) == 9.999998e-01
+tanh(8.500000e+00) == 9.999999e-01
+tanh(9.000000e+00) == 1.000000e+00
+tanh(9.500000e+00) == 1.000000e+00
+tanh(1.000000e+01) == 1.000000e+00
+tanh(1.050000e+01) == 1.000000e+00
+tanh(1.100000e+01) == 1.000000e+00
+tanh(1.150000e+01) == 1.000000e+00
+tanh(1.200000e+01) == 1.000000e+00
+tanh(1.250000e+01) == 1.000000e+00
+tanh(1.300000e+01) == 1.000000e+00
+tanh(1.350000e+01) == 1.000000e+00
+tanh(1.400000e+01) == 1.000000e+00
+tanh(1.450000e+01) == 1.000000e+00
+tanh(1.500000e+01) == 1.000000e+00
+tanh(1.550000e+01) == 1.000000e+00
+tanh(1.600000e+01) == 1.000000e+00
+tanh(1.650000e+01) == 1.000000e+00
+tanh(1.700000e+01) == 1.000000e+00
+tanh(1.750000e+01) == 1.000000e+00
+tanh(1.800000e+01) == 1.000000e+00
+tanh(1.850000e+01) == 1.000000e+00
+tanh(1.900000e+01) == 1.000000e+00
+tanh(1.950000e+01) == 1.000000e+00
+tanh(2.000000e+01) == 1.000000e+00
+#+end_example
+
+
+
+
+
+
+
+
+
+OK so how does this work, how do link to math?
+
+#+BEGIN_SRC sh :exports both :tangle build-tanh-example.sh
+# build checkinput-driver and link it to checkinput.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o poor-tanh-example poor-tanh-example.c \
+       -lm
+file poor-tanh-example
+./poor-tanh-example | wc
+ldd ./poor-tanh-example
+#+END_SRC
+
+#+RESULTS:
+: poor-tanh-example: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/l, for GNU/Linux 3.2.0, BuildID[sha1]=fdd28691d4637c2a9b9a76b129ea7585894e4378, with debug_info, not stripped
+:      40     120    1400
+: 	linux-vdso.so.1 (0x00007ffcfbbf2000)
+: 	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fced4bee000)
+: 	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fced47fd000)
+: 	/lib64/ld-linux-x86-64.so.2 (0x00007fced518e000)
+
+See that? libm.so.6 is in there.
+
+Larger programs link to lots of libraries.
+
+#+BEGIN_SRC sh :exports both
+ldd `which xterm`
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+	linux-vdso.so.1 (0x00007ffe07d09000)
+	libXft.so.2 => /usr/lib/x86_64-linux-gnu/libXft.so.2 (0x00007fd924dab000)
+	libfontconfig.so.1 => /usr/lib/x86_64-linux-gnu/libfontconfig.so.1 (0x00007fd924b66000)
+	libXaw.so.7 => /usr/lib/x86_64-linux-gnu/libXaw.so.7 (0x00007fd9248f2000)
+	libXmu.so.6 => /usr/lib/x86_64-linux-gnu/libXmu.so.6 (0x00007fd9246d9000)
+	libXt.so.6 => /usr/lib/x86_64-linux-gnu/libXt.so.6 (0x00007fd924470000)
+	libX11.so.6 => /usr/lib/x86_64-linux-gnu/libX11.so.6 (0x00007fd924138000)
+	libXinerama.so.1 => /usr/lib/x86_64-linux-gnu/libXinerama.so.1 (0x00007fd923f35000)
+	libXpm.so.4 => /usr/lib/x86_64-linux-gnu/libXpm.so.4 (0x00007fd923d23000)
+	libICE.so.6 => /usr/lib/x86_64-linux-gnu/libICE.so.6 (0x00007fd923b08000)
+	libutempter.so.0 => /usr/lib/x86_64-linux-gnu/libutempter.so.0 (0x00007fd923905000)
+	libtinfo.so.5 => /lib/x86_64-linux-gnu/libtinfo.so.5 (0x00007fd9236db000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd9232ea000)
+	libfreetype.so.6 => /usr/lib/x86_64-linux-gnu/libfreetype.so.6 (0x00007fd923036000)
+	libXrender.so.1 => /usr/lib/x86_64-linux-gnu/libXrender.so.1 (0x00007fd922e2c000)
+	libexpat.so.1 => /lib/x86_64-linux-gnu/libexpat.so.1 (0x00007fd922bfa000)
+	libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007fd9229db000)
+	libXext.so.6 => /usr/lib/x86_64-linux-gnu/libXext.so.6 (0x00007fd9227c9000)
+	libSM.so.6 => /usr/lib/x86_64-linux-gnu/libSM.so.6 (0x00007fd9225c1000)
+	libxcb.so.1 => /usr/lib/x86_64-linux-gnu/libxcb.so.1 (0x00007fd922399000)
+	libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fd922195000)
+	libbsd.so.0 => /lib/x86_64-linux-gnu/libbsd.so.0 (0x00007fd921f80000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007fd925270000)
+	libpng16.so.16 => /usr/lib/x86_64-linux-gnu/libpng16.so.16 (0x00007fd921d4e000)
+	libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007fd921b31000)
+	libuuid.so.1 => /lib/x86_64-linux-gnu/libuuid.so.1 (0x00007fd92192a000)
+	libXau.so.6 => /usr/lib/x86_64-linux-gnu/libXau.so.6 (0x00007fd921726000)
+	libXdmcp.so.6 => /usr/lib/x86_64-linux-gnu/libXdmcp.so.6 (0x00007fd921520000)
+	librt.so.1 => /lib/x86_64-linux-gnu/librt.so.1 (0x00007fd921318000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fd920f7a000)
+#+end_example
+
+See! Lots of libraries!
+
+**** Summary 
+
+To link to a shared library with gcc or clang use the:
+  -l flag
+  -llibraryyouwant
+
+For libm use -lm for librt use -lrt
+
+If your library is not in the current lib path you will need to
+specify a library path use -L/path/to/library
+
+OK let's see how it affects you.
+
+*** Example Datastructure
+
+Let's make a brief data structure about one of my favourite topics:
+cool bears.
+
+file:./coolbears.c
+
+#+BEGIN_SRC C :exports both :tangle coolbears.c :main no
+#define _POSIX_C_SOURCE 200809L // <-- needed for strdup
+#include "coolbears.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+// hiding struct details from other programmers
+// I DONT TRUST THEM. Especially Hazel ;-) (don't tell hazel)
+struct coolbear_t {
+    char * name;
+    float temperature;
+};
+
+CoolBear createCoolBear(char * name, float temperature) {
+    CoolBear coolbear = malloc(sizeof(*coolbear));
+    coolbear->name = strdup(name);
+    coolbear->temperature = temperature;
+    return coolbear;
+}
+void freeCoolBear(CoolBear coolBear) {
+    if (coolBear == NULL) {
+        abort();
+    }
+    if (coolBear->name != NULL) {
+        free(coolBear->name);
+    }
+    free(coolBear);
+}
+char * getNameCoolBear(CoolBear coolbear) {
+    return coolbear->name;
+}
+float    getTemperatureCoolBear(CoolBear coolbear) {
+   return coolbear->temperature;
+}
+// NO MAIN!
+#+END_SRC 
+
+
+
+#+RESULTS:
+
+file:./coolbears.h
+
+#+BEGIN_SRC C :exports both :tangle coolbears.h :main no
+// Have a guard to ensure that we don't include it multiple times.
+#ifndef _COOLBEARS_H_
+/* checkInput: given the result of scanf check if it 
+ * 0 elements read or EOF. If so exit(1) with a warning.
+ *
+ */
+#define _COOLBEARS_H_
+struct coolbear_t; // Forward declaration -- I am not sharing details!
+typedef struct coolbear_t * CoolBear; // Struct point as type
+
+CoolBear createCoolBear(char * name, float temperature); // a prototype!
+void     freeCoolBear(CoolBear coolBear); // a prototype!
+char *   getNameCoolBear(CoolBear coolbear); // a prototype!
+float    getTemperatureCoolBear(CoolBear coolbear); // a prototype!
+
+#endif
+#+END_SRC 
+
+#+RESULTS:
+
+file:./coolbears-driver.c
+
+#+BEGIN_SRC C :exports both :tangle coolbears-driver.c :libs coolbears.c
+#include "coolbears.h"
+#include <stdio.h>
+
+int main() {
+  CoolBear ziggy = createCoolBear("Ziggy",-23.0 /* C */);
+  CoolBear kevin = createCoolBear("Kevin",-32.0 /* C */);
+  CoolBear coolest = (getTemperatureCoolBear(ziggy) < 
+                      getTemperatureCoolBear(kevin))? ziggy : kevin;
+  printf("The coolest bear is %s\n", getNameCoolBear( coolest ));
+  // // we actually don't know about name so we can't reference it below
+  // printf("The coolest bear is %s\n", coolest->name );
+  freeCoolBear(ziggy);
+  freeCoolBear(kevin);
+}
+#+END_SRC 
+
+#+RESULTS:
+
+Compile it. -c the coolbears.c to make coolbears.o and then 
+compile coolbears-driver.c
+
+coolbears-driver.c has no clue how to access 
+
+#+BEGIN_SRC sh :exports both :tangle build-coolbears.sh
+# build coolbears.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -c coolbears.c
+# build coolbears-driver and link it to coolbears.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o coolbears-driver coolbears-driver.c \
+       coolbears.o 
+./coolbears-driver
+#+END_SRC
+
+#+RESULTS:
+: The coolest bear is Kevin
+
+If we access coolest->name we get:
+
+#+begin_example
+coolbears-driver.c: In function ‘main’:
+coolbears-driver.c:11:62: error: dereferencing pointer to incomplete type ‘struct coolbear_t’
+   printf("The coolest bear is %s\n", getNameCoolBear( coolest->name ));
+#+end_example
+
+
+*** What is the preprocessor doing?
+
+Let's use the -E flag to see what checkinput.c becomes
+
+This output contains glibc headers for stdio.h and stdlib.h these
+should be under the GPLV3 (c) the Glibc project and GNU project.
+
+If you want more preprocessor options checkout:
+
+https://gcc.gnu.org/onlinedocs/gcc-5.2.0/gcc/Preprocessor-Options.html
+
+#+BEGIN_SRC sh :eval yes :results value drawer code
+# build checkinput.o
+gcc -E -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       checkinput.c > checkinput-preprocessor.c
+#+END_SRC
+
+#+RESULTS:
+#+begin_src sh
+#+end_src
+
+It produces this file:
+
+file:checkinput-preprocessor.c
+
+
+#+begin_src C :eval no
+# 1 "checkinput.c"
+# 1 "/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10//"
+# 1 "<built-in>"
+#define __STDC__ 1
+#define __STDC_VERSION__ 199901L
+#define __STDC_HOSTED__ 1
+#define __GNUC__ 7
+#define __GNUC_MINOR__ 5
+#define __GNUC_PATCHLEVEL__ 0
+
+// lots of definitions
+
+# 1 "/usr/include/stdio.h" 1 3 4
+# 24 "/usr/include/stdio.h" 3 4
+#define _STDIO_H 1
+
+// Start of STDIO_H
+
+// ...
+
+extern int printf (const char *__restrict __format, ...);
+
+extern int sprintf (char *__restrict __s,
+      const char *__restrict __format, ...) __attribute__ ((__nothrow__));
+
+
+// LOTS OF STDIO.H
+
+
+// LOTS OF STDLIB.H
+
+# 1016 "/usr/include/stdlib.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/stdlib-float.h" 1 3 4
+# 1017 "/usr/include/stdlib.h" 2 3 4
+# 1026 "/usr/include/stdlib.h" 3 4
+
+# 5 "checkinput.c" 2
+
+
+
+
+
+# 9 "checkinput.c"
+void checkInput(int err) {
+  if (!err || err == 
+# 10 "checkinput.c" 3 4
+                    (-1)
+# 10 "checkinput.c"
+                       ) {
+    printf("\nInvalid input!\n");
+    exit(1);
+  }
+}
+return 0;
+}
+#+end_src
+
+file:checkinput-preprocessor.c
+
+
+*** Parameterized Macros
+
+As we just demonstrated Macros generate code. So we can make compile
+functions that generate code. These functions run at compile time and
+generate code that is compiled by C.
+
+#+BEGIN_SRC C :tangle relu.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+// RELU is a rectified linear unit. These are popular in convolutional neural networks
+// they are 0 for 0 and negative numbers and they are the identity for positive numbers.
+// RELU(-100) = RELU(-1) = 0 && RELU(1) = 1 && RELU(100) = 100
+#define RELU(x)  (( x < 0 )?0:x)
+
+int main() {
+    // ints
+    for (int i = -10; i < 10; i++) {
+        printf("RELU(%d)=%d\n", i, RELU(i));
+    }
+    puts("\n");
+    // more in the range of neural networks
+    for (double i = -1; i < 1; i+=0.1) {
+        printf("RELU(%f)=%f\n", i, RELU(i));
+    }
+    puts("\n");
+}
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+RELU(-10)=0
+RELU(-9)=0
+RELU(-8)=0
+RELU(-7)=0
+RELU(-6)=0
+RELU(-5)=0
+RELU(-4)=0
+RELU(-3)=0
+RELU(-2)=0
+RELU(-1)=0
+RELU(0)=0
+RELU(1)=1
+RELU(2)=2
+RELU(3)=3
+RELU(4)=4
+RELU(5)=5
+RELU(6)=6
+RELU(7)=7
+RELU(8)=8
+RELU(9)=9
+
+
+RELU(-1.000000)=0.000000
+RELU(-0.900000)=0.000000
+RELU(-0.800000)=0.000000
+RELU(-0.700000)=0.000000
+RELU(-0.600000)=0.000000
+RELU(-0.500000)=0.000000
+RELU(-0.400000)=0.000000
+RELU(-0.300000)=0.000000
+RELU(-0.200000)=0.000000
+RELU(-0.100000)=0.000000
+RELU(-0.000000)=0.000000
+RELU(0.100000)=0.100000
+RELU(0.200000)=0.200000
+RELU(0.300000)=0.300000
+RELU(0.400000)=0.400000
+RELU(0.500000)=0.500000
+RELU(0.600000)=0.600000
+RELU(0.700000)=0.700000
+RELU(0.800000)=0.800000
+RELU(0.900000)=0.900000
+RELU(1.000000)=1.000000
+#+end_example
+
+#+BEGIN_SRC sh :exports both
+gcc -E -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       relu.c > \
+       relu-expanded.c
+#+END_SRC
+
+#+RESULTS:
+
+file:relu-expanded.c
+
+#+BEGIN_SRC C :eval no
+#define RELU(x) (( x < 0 )?0:x)
+
+
+# 10 "relu.c"
+int main() {
+
+    for (int i = -10; i < 10; i++) {
+        printf("RELU(%d)=%d\n", i, (( i < 0 )?0:i));
+    }
+    puts("\n");
+
+    for (double i = -1; i < 1; i+=0.1) {
+        printf("RELU(%f)=%f\n", i, (( i < 0 )?0:i));
+    }
+    puts("\n");
+}
+#+END_SRC 
+
+That's interesting, but be aware that x is not a value. It is a set of tokens.
+
+#+BEGIN_SRC C :tangle relu2.c :libs -lm
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+// RELU is a rectified linear unit. These are popular in convolutional neural networks
+// they are 0 for 0 and negative numbers and they are the identity for positive numbers.
+// RELU(-100) = RELU(-1) = 0 && RELU(1) = 1 && RELU(100) = 100
+#define RELU(x)  (( x < 0 )?0:x)
+
+int main() {
+    double x = 2.0;
+    double y = 127.1;
+    // How many times will pow(x,y) run?
+    printf("%f\n", RELU(pow(x,y)));
+
+}
+#+END_SRC
+
+#+RESULTS:
+: 1.8235280531744908e+38
+
+#+BEGIN_SRC sh :exports both
+gcc -E -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       relu2.c > \
+       relu2-expanded.c
+#+END_SRC
+
+#+RESULTS:
+
+file:relu2-expanded.c
+
+#+BEGIN_SRC C :eval no
+#define RELU(x) (( x < 0 )?0:x)
+
+
+# 11 "relu2.c"
+int main() {
+    double x = 2.0;
+    double y = 127.1;
+    // Uh oh how many pows?
+    printf("%f\n", (( pow(x,y) < 0 )?0:pow(x,y)));
+
+}
+#+END_SRC
+
+**** Easy bugs!
+
+So why doesn't this work?
+
+file:./checkinputmacro.c
+
+#+BEGIN_SRC C :exports both :tangle checkinputmacro.c :main no
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+// if checkinput is true then you have an error
+#define CHECKINPUT(scanfReturn)  ( scanfReturn == EOF || !scanfReturn )
+
+int main() {
+    int myInt = 0;
+    if (CHECKINPUT(scanf("%d", &myInt))) {
+        printf("Invalid input!\n");
+        exit(1);
+    }
+    printf("My int: %d\n", myInt);
+}
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o checkinputmacro checkinputmacro.c
+echo 6  | ./checkinputmacro
+echo 6 7 | ./checkinputmacro
+echo 6 X | ./checkinputmacro || echo exit was $?
+echo X 6 | ./checkinputmacro || echo exit was $?
+echo | ./checkinputmacro || echo exit was $?
+#+END_SRC
+
+#+RESULTS:
+: My int: 6
+: My int: 7
+: Invalid input!
+: exit was 1
+: Invalid input!
+: exit was 1
+: Invalid input!
+: exit was 1
+
+#+BEGIN_SRC sh :exports both
+gcc -E -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       checkinputmacro.c > \
+       checkinputmacro-expanded.c
+#+END_SRC
+
+#+RESULTS:
+
+file:checkinputmacro-expanded.c
+
+Let's look at the output:
+
+#+BEGIN_SRC C :eval no :exports both
+#define CHECKINPUT(scanfReturn) ( scanfReturn == false || scanfReturn == EOF)
+
+# 8 "checkinputmacro.c"
+int main() {
+    int myInt = 0;
+    if (( scanf("%d", &myInt) == 
+       0 
+       || scanf("%d", &myInt) == 
+       (-1)
+       )) {
+        printf("Invalid input!\n");
+        exit(1);
+    }
+    printf("My int: %d\n", myInt);
+}
+#+END_SRC
+
+I'll clear it up for you
+
+#+BEGIN_SRC C :eval no :exports both
+#define CHECKINPUT(scanfReturn) ( scanfReturn == false || scanfReturn == EOF)
+
+int main() {
+    int myInt = 0;
+    if (( scanf("%d", &myInt) ==  0 || scanf("%d", &myInt) == (-1))) {
+        printf("Invalid input!\n");
+        exit(1);
+    }
+    printf("My int: %d\n", myInt);
+}
+#+END_SRC
+
+See? 2 scanfs instead of 1. Great. So macros will copy your tokens,
+not your values. They are meta-functions and not real functions.
+
+How do we fix? We assign the result once!
+
+#+BEGIN_SRC C :exports both :tangle checkinputmacro-fixed.c :main no
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+// if checkinput is true then you have an error
+// horrible and bad style don't do this at home!
+static int __ret;
+#define CHECKINPUT(scanfReturn)  (__ret = scanfReturn, (__ret== EOF || !__ret ))
+
+int main() {
+    int myInt = 0;
+    if (CHECKINPUT(scanf("%d", &myInt))) {
+        printf("Invalid input!\n");
+        exit(1);
+    }
+    printf("My int: %d\n", myInt);
+}
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o checkinputmacro-fixed checkinputmacro-fixed.c
+echo   | ./checkinputmacro-fixed
+echo X | ./checkinputmacro-fixed
+echo 6 | ./checkinputmacro-fixed
+echo 7 8| ./checkinputmacro-fixed
+#+END_SRC
+
+#+RESULTS:
+: Invalid input!
+: Invalid input!
+: My int: 6
+: My int: 7
+
+#+BEGIN_SRC sh :exports both
+gcc -E -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       checkinputmacro-fixed.c > \
+       checkinputmacro-fixed-expanded.c
+#+END_SRC
+
+file:checkinputmacro-fixed-expanded.c
+
+#+BEGIN_SRC C :eval no
+# 7 "checkinputmacro-fixed.c"
+static int __ret;
+#define CHECKINPUT(scanfReturn) (__ret = scanfReturn, (__ret== EOF || !__ret ))
+
+int main() {
+    int myInt = 0;
+    if ((__ret = scanf("%d", &myInt), (__ret== 
+# 12 "checkinputmacro-fixed.c" 3 4
+       (-1) 
+# 12 "checkinputmacro-fixed.c"
+       || !__ret ))) {
+        printf("Invalid input!\n");
+        exit(1);
+    }
+    printf("My int: %d\n", myInt);
+}
+#+END_SRC
+
+** Makefiles
+
+I am sick to death of all these shell scripts!
+
+Look at the assignments 1 shell script per question and they mostly
+say the same things.
+
+Programmers uses build systems to manage compiling and linking large
+programs. They often do not use shell scripts or batch files directly.
+
+Makefiles allow you to use make to build your program. Make is
+declarative, dependency based build system.
+
+Makefiles are full of rules for building files.
+
+#+BEGIN_SRC makefile
+file-you-want-to-build: dependency1.c dependency2.o dependency3.o
+	gcc -o file-you-want-to-build dependency1.c dependency2.o dependency3.o
+#+END_SRC
+
+^^^ There is a tab character before the gcc 
+
+To build file-you-want-to-build you type:
+
+    make file-you-want-to-build
+    # or perhaps
+    make
+
+*** Basic Makefile
+
+We're going to use the coolbears source code from before.
+
+Instead of this:
+
+#+BEGIN_SRC sh :exports both :tangle build-coolbears.sh
+# build coolbears.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -c coolbears.c
+# build coolbears-driver and link it to coolbears.o
+gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+       -o coolbears-driver coolbears-driver.c \
+       coolbears.o 
+./coolbears-driver
+#+END_SRC
+
+#+BEGIN_SRC makefile :tangle Makefile.coolbears
+# this just runs a command but ensures it is built
+# first directive runs by default
+# usually you should but put the top level build directive here
+run: coolbears-driver
+	./coolbears-driver # just a shell command
+
+# build an object file
+coolbears.o: coolbears.c coolbears.h
+	gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+        -c coolbears.c
+
+# build an executable
+coolbears-driver: coolbears-driver.c coolbears.o
+	gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+	-o coolbears-driver coolbears-driver.c \
+	coolbears.o 
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f coolbears.o coolbears-driver
+
+#+END_SRC
+
+let's run it. Normally make just runs Makefile. But if you have your
+own makefiles you should use the -f option with make.
+
+#+BEGIN_SRC sh :exports both
+make -f Makefile.coolbears clean
+make -f Makefile.coolbears coolbears.o
+make -f Makefile.coolbears coolbears-driver
+make -f Makefile.coolbears run
+#+END_SRC
+
+#+RESULTS:
+: rm -f coolbears.o coolbears-driver || echo nothing to delete
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+:         -c coolbears.c
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+: -o coolbears-driver coolbears-driver.c \
+: coolbears.o 
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+Or we could just do this:
+#+BEGIN_SRC sh :exports both
+# I am making clean just to clear out the executables and object files
+make -f Makefile.coolbears clean
+make -f Makefile.coolbears run
+#+END_SRC
+
+#+RESULTS:
+: rm coolbears.o coolbears-driver || echo nothing to delete
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+:         -c coolbears.c
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+: -o coolbears-driver coolbears-driver.c \
+: coolbears.o 
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+OR we could do this!
+
+#+BEGIN_SRC sh :exports both
+# I am making clean just to clear out the executables and object files
+make -f Makefile.coolbears clean
+make -f Makefile.coolbears
+#+END_SRC
+
+#+RESULTS:
+: rm -f coolbears.o coolbears-driver || echo nothing to delete
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+:         -c coolbears.c
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+: -o coolbears-driver coolbears-driver.c \
+: coolbears.o 
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+Ha it does the same thing!
+
+
+What if I run make again?
+
+#+BEGIN_SRC sh :exports both
+# I am making clean just to clear out the executables and object files
+make -f Makefile.coolbears
+#+END_SRC
+
+#+RESULTS:
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+It just uses the old object files.
+
+#+BEGIN_SRC sh :exports both
+# if I remove the executable it'll rebuild only the executable
+rm coolbears-driver
+make -f Makefile.coolbears
+#+END_SRC
+
+#+RESULTS:
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+: -o coolbears-driver coolbears-driver.c \
+: coolbears.o 
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+#+BEGIN_SRC sh :exports both
+# if I remove the object files it'll build the whole thing
+rm *.o
+make -f Makefile.coolbears
+#+END_SRC
+
+#+RESULTS:
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+:         -c coolbears.c
+: gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+: -o coolbears-driver coolbears-driver.c \
+: coolbears.o 
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+
+Personally I would've preferred if assignments were done this way.
+
+*** DRY Makefile
+
+DRY means DON'T REPEAT YOURSELF.
+
+Let's make a makefile that is easier to use and less prone to errors
+by repeating text.
+
+Instead of this:
+
+#+BEGIN_SRC makefile 
+# this just runs a command but ensures it is built
+run: coolbears-driver
+	./coolbears-driver # just a shell command
+
+# build an object file
+coolbears.o: coolbears.c
+	gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+        -c coolbears.c
+
+# build an executable
+coolbears-driver: coolbears-driver.c coolbears.o
+	gcc  -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 \
+	-o coolbears-driver coolbears-driver.c \
+	coolbears.o 
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f coolbears.o coolbears-driver 
+
+
+#+END_SRC
+
+We're going to automate our Makefile a little more with variables.
+
+You can make a variable in a makefile by going
+   VARNAME=some string of stuff
+   LISTNAME=item1 item2 item3 item4
+   SCALARNAME="SCALAR VALUE"
+
+#+BEGIN_SRC makefile :tangle Makefile.coolbears.dry
+# common arguments for GCC
+CFLAGS= -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3
+LDFLAGS=-lm
+# Common compiler
+CC=gcc
+# you might call these OBJECTS instead
+BUILDABLES=coolbears.o coolbears-driver
+OBJECTS=coolbears.o coolbears-driver.o
+
+# this just runs a command but ensures it is built
+run: coolbears-driver
+	./coolbears-driver # just a shell command
+
+coolbears.o: coolbears.c
+	$(CC) $(CFLAGS) \
+        -c coolbears.c
+
+coolbears2.o: coolbears2.c
+	$(CC) $(CFLAGS) \
+        -c coolbears2.c
+
+# build an executable
+coolbears-driver: coolbears-driver.c coolbears.o
+	$(CC) $(CFLAGS) \
+	-o coolbears-driver coolbears-driver.c \
+	coolbears.o 
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f $(BUILDABLES)
+#+END_SRC
+
+let's run it. Normally make just runs Makefile. But if you have your
+own makefiles you should use the -f option with make.
+
+#+BEGIN_SRC sh :exports both
+make -f Makefile.coolbears.dry run
+#+END_SRC
+
+#+RESULTS:
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+*** Idiomatic GCC Makefile
+
+Make knows a lot about C. Make comes with default rules that will call
+your compiler for you as long as CFLAGS and CC are properly set!
+
+This means it knows how to make an executable. 
+
+It knows how to make an object file. It just needs to know the
+dependencies.
+
+You can reuse this makefile as well!
+
+#+BEGIN_SRC makefile :tangle Makefile.coolbears.idiomatic
+# common arguments for GCC
+CFLAGS= -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3
+# Do you need your math lib? Put it here this is the linking libraries
+# variable
+LDFLAGS=$(CFLAGS) -lm
+# Common compiler
+CC=gcc
+OBJECTS=coolbears.o coolbears-driver.o
+EXEC=coolbears-driver
+BUILDABLES=$(OBJECTS) $(EXEC)
+
+# this just runs a command but ensures it is built
+run: $(EXEC)
+	./$(EXEC) # just a shell command
+
+# We don't even need to specify how to make coolbears.o
+# try commenting and uncommenting this line
+# coolbears.o: coolbears.c
+
+# build an executable
+# coolbears-driver: coolbears-driver.c coolbears.o
+
+# # this would work too
+# coolbears-driver: coolbears-driver.o coolbears.o
+
+coolbears-driver:  coolbears-driver.o coolbears.o
+
+$(EXEC): $(OBJECTS)
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f $(BUILDABLES)
+#+END_SRC
+
+let's run it. Normally make just runs Makefile. But if you have your
+own makefiles you should use the -f option with make.
+
+#+BEGIN_SRC sh :exports both
+# make -f Makefile.coolbears.idiomatic clean
+make -f Makefile.coolbears.idiomatic run
+#+END_SRC
+
+#+RESULTS:
+: gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3   -c -o coolbears-driver.o coolbears-driver.c
+: gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3   -c -o coolbears.o coolbears.c
+: gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -lm  coolbears-driver.o coolbears.o   -o coolbears-driver
+: ./coolbears-driver # just a shell command
+: The coolest bear is Kevin
+
+*** Special Macro Vars
+
+- $@ the target file name
+
+- $< the first dependency
+
+- $? new dependencies that have changed
+
+- $^ all dependencies
+
+- $* target suffix (it matches % in implicit rules)
+
+#+BEGIN_SRC makefile :tangle Makefile.macros
+OBJECTS=example.txt 1.txt 2.txt 3.txt
+
+run: example.txt
+	echo $@ $< $*
+	cat example.txt
+
+example.txt: 1.txt 2.txt 3.txt 4.txt 5.txt
+	echo First Dependency $<
+	echo Target $@
+	echo New Deps $?
+	echo All Deps $^
+	echo target suffix $*
+	cat $^ > example.txt
+
+1.txt:
+	echo $@ > $@
+2.txt:
+	echo $@ > $@
+3.txt:
+	echo $@ > $@
+%.txt:
+	echo $* $@ > $@
+
+clean:
+	rm $(OBJECTS) || echo all good
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both
+make -f Makefile.macros clean
+make -f Makefile.macros 8.txt
+cat 8.txt
+#+END_SRC
+
+#+RESULTS:
+: rm example.txt 1.txt 2.txt 3.txt || echo all good
+: echo 8 8.txt > 8.txt
+: 8 8.txt
+
+**** Implicit Rules
+
+Here's an example of implicit rules. Of how we convert 1 file to
+another implicitly much like how Make hands C compilation.
+
+#+BEGIN_SRC makefile
+############################### Implicit rules ###############################
+
+# Convert a .tex file to a .pdf
+%.pdf: %.tex $(ALLDEPS)
+	latexmk -pdf $(LATEXMK_OPTS) $*
+
+# Convert SVGs to PDFs
+# Requires Inkscape
+%.pdf: %.svg
+	inkscape -b white -t -T --export-ignore-filters --export-pdfs=$@ $<
+
+# Convert EPSs to PDFs
+# epstopdf(1) is often bundled with TeX distributions
+%.pdf: %.eps
+	epstopdf $<
+
+# Automatically crops the margins of a PDF.
+%-crop.pdf: %.pdf
+	pdfcrop $<
+#+END_SRC
+
+*** Can we lint and valgrind with our makefiles?
+
+#+BEGIN_SRC makefile :tangle Makefile.coolbears.lint
+# common arguments for GCC
+CFLAGS= -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3
+# Common compiler
+CC=gcc
+# you might call these OBJECTS instead
+BUILDABLES=coolbears.o coolbears-driver
+# clangtidy checks
+CHECKS=--checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp
+# oclint checks
+LINTR=--disable-rule=UselessParentheses
+CLANGTIDY=clang-tidy
+OCLINT=oclint
+.PHONY: run clean lint-coolbears-driver
+
+# this just runs a command but ensures it is built
+run: coolbears-driver
+	./coolbears-driver # just a shell command
+
+coolbears.o: coolbears.c coolbears.h
+	$(CC) $(CFLAGS) \
+        -c coolbears.c
+
+coolbears-driver.o: coolbears-driver.c coolbears.c
+	$(CC) $(CFLAGS) \
+        -c coolbears.c
+
+# build an executable
+coolbears-driver: coolbears-driver.o coolbears.o
+	$(CC) $(CFLAGS) \
+	-o coolbears-driver coolbears-driver.o \
+	coolbears.o 
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f $(BUILDABLES) 
+
+lint-coolbears-driver: coolbears-driver.c
+	$(CLANGTIDY) $(CHECKS) \
+		$< -- \
+		$(CFLAGS) -c $^ $(LDFLAGS)
+	$(OCLINT) $(LINTR) $< \
+		-- $(CFLAGS) -c $< $(LDFLAGS)
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both
+make -f Makefile.coolbears.lint lint-coolbears-driver
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+clang-tidy --checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp \
+	coolbears-driver.c -- \
+	-std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears-driver.c 
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:5:43: warning: narrowing conversion from 'double' to 'float' [bugprone-narrowing-conversions]
+  CoolBear ziggy = createCoolBear("Ziggy",-23.0 /* C */);
+                                          ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:5:44: warning: 23.0 is a magic number; consider replacing it with a named constant [cppcoreguidelines-avoid-magic-numbers]
+  CoolBear ziggy = createCoolBear("Ziggy",-23.0 /* C */);
+                                           ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:6:43: warning: narrowing conversion from 'double' to 'float' [bugprone-narrowing-conversions]
+  CoolBear kevin = createCoolBear("Kevin",-32.0 /* C */);
+                                          ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:6:44: warning: 32.0 is a magic number; consider replacing it with a named constant [cppcoreguidelines-avoid-magic-numbers]
+  CoolBear kevin = createCoolBear("Kevin",-32.0 /* C */);
+                                           ^
+oclint --disable-rule=UselessParentheses coolbears-driver.c \
+	-- -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears-driver.c 
+
+
+OCLint Report
+
+Summary: TotalFiles=1 FilesWithViolations=0 P1=0 P2=0 P3=0 
+
+
+[OCLint (http://oclint.org) v0.15]
+#+end_example
+
+We can go further:
+
+#+BEGIN_SRC makefile :tangle Makefile.coolbears.lint.dry
+# common arguments for GCC
+CFLAGS= -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3
+# Common compiler
+CC=gcc
+# you might call these OBJECTS instead
+BUILDABLES=coolbears.o coolbears-driver
+# clangtidy checks
+CHECKS=--checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp
+# oclint checks
+LINTR=--disable-rule=UselessParentheses
+CLANGTIDY=clang-tidy
+OCLINT=oclint
+HEADERS=coolbears.h
+OBJECTS=coolbears.o coolbears-driver.o
+EXECUTABLE=coolbears-driver
+
+.PHONY: lint-% run clean valgrind
+
+# this just runs a command but ensures it is built
+run: $(EXECUTABLE)
+	./$(EXECUTABLE)
+
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< 
+	$(CLANGTIDY) $(CHECKS) \
+		$< -- \
+		$(CFLAGS) -c $< $(LDFLAGS)
+	$(OCLINT) $(LINTR) $< \
+		-- $(CFLAGS) -c $< $(LDFLAGS)
+
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f $(EXECUTABLE) $(OBJECTS) 
+
+lint-%: %.c
+	$(CLANGTIDY) $(CHECKS) \
+		$< -- \
+		$(CFLAGS) -c $< $(LDFLAGS)
+	$(OCLINT) $(LINTR) $< \
+		-- $(CFLAGS) -c $< $(LDFLAGS)
+
+# Lookie here how these 2 valgrinds are very similar
+valgrind-%: %
+	valgrind --leak-check=full --track-origins=yes ./$< 2>&1
+
+valgrind: $(EXECUTABLE)
+	valgrind --leak-check=full --track-origins=yes ./$< 2>&1
+
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both
+make -f Makefile.coolbears.lint.dry clean run
+#make -f Makefile.coolbears.lint.dry lint-coolbears-driver
+#make -f Makefile.coolbears.lint.dry lint-coolbears
+#make -f Makefile.coolbears.lint.dry valgrind-coolbears-driver
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+rm -f coolbears-driver coolbears.o coolbears-driver.o 
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears.c 
+clang-tidy --checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp \
+	coolbears.c -- \
+	-std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears.c 
+oclint --disable-rule=UselessParentheses coolbears.c \
+	-- -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears.c 
+
+
+OCLint Report
+
+Summary: TotalFiles=1 FilesWithViolations=0 P1=0 P2=0 P3=0 
+
+
+[OCLint (http://oclint.org) v0.15]
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears-driver.c 
+clang-tidy --checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp \
+	coolbears-driver.c -- \
+	-std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears-driver.c 
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:5:43: warning: narrowing conversion from 'double' to 'float' [bugprone-narrowing-conversions]
+  CoolBear ziggy = createCoolBear("Ziggy",-23.0 /* C */);
+                                          ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:5:44: warning: 23.0 is a magic number; consider replacing it with a named constant [cppcoreguidelines-avoid-magic-numbers]
+  CoolBear ziggy = createCoolBear("Ziggy",-23.0 /* C */);
+                                           ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:6:43: warning: narrowing conversion from 'double' to 'float' [bugprone-narrowing-conversions]
+  CoolBear kevin = createCoolBear("Kevin",-32.0 /* C */);
+                                          ^
+/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/coolbears-driver.c:6:44: warning: 32.0 is a magic number; consider replacing it with a named constant [cppcoreguidelines-avoid-magic-numbers]
+  CoolBear kevin = createCoolBear("Kevin",-32.0 /* C */);
+                                           ^
+oclint --disable-rule=UselessParentheses coolbears-driver.c \
+	-- -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -c coolbears-driver.c 
+
+
+OCLint Report
+
+Summary: TotalFiles=1 FilesWithViolations=0 P1=0 P2=0 P3=0 
+
+
+[OCLint (http://oclint.org) v0.15]
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -o coolbears-driver coolbears.o coolbears-driver.o
+./coolbears-driver
+The coolest bear is Kevin
+#+end_example
+
+*** .PHONY
+
+Hazel says:
+
+    It is also often useful to have a rule that removes the compiled code
+    so that you can easily compile your program from scratch. This is
+    useful when you change your Makefile. We can add a phony rule named
+    clean so that when we run “make clean” on the command line it removes
+    all the compiler outputs: s-expr, s-expr.o, and main.o:
+    #+BEGIN_SRC Makefile :exports both :eval no
+    .PHONY: clean
+    clean:
+           rm -f s-expr s-expr.o main.o
+    #+END_SRC
+    This tells make:
+
+    “clean” is not an actual file that will be made, instead we should
+    run the recipe for “clean” everytime we make “clean”.
+    
+    “clean” doesn’t have any input files that will change the output
+    (there is nothing after the colon :)
+    
+    When we make “clean” we will remove the files s-expr, s-expr.o, and main.o.
+
+
+
+*** Makefile help
+
+The GNU Manual is pretty good
+
+https://www.gnu.org/software/make/manual/html_node/Introduction.html
+
+Hazel's write up is very good (UAlberta ONLY)
+
+https://docs.google.com/document/d/1k8bAErdg6ju8reniMUhnkkjCtwUHWCM9mn59iHnI0rc/
+
+** Useful Tool! asan and usan
+
+Google made some static analysis tools to detect issues!
+
+(From chefmax of Google (2020) https://github.com/google/sanitizers/wiki/AddressSanitizer )
+
+Address sanitizer detects (ASAN):
+
+  - Use after free (dangling pointer dereference)
+  - Heap buffer overflow
+  - Stack buffer overflow
+  - Global buffer overflow
+  - Use after return
+  - Use after scope
+  - Initialization order bugs
+  - Memory leaks
+
+I've been telling y'all to use it in the discussion forum. It's like
+valgrind but it does different things and has nice output.
+
+How do you use it?
+
+With clang or gcc add the argument
+
+   -fsanitize=address
+   -fsanitize=undefined
+
+For address sanitization or undefined santitization.
+
+USAN is undefined sanitiziation it detects uses of undefined behaviour in.
+
+If you want more options check out https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+
+**** ./array_oob.c
+file:./array_oob.c
+
+#+BEGIN_SRC C :exports code :tangle array_oob.c
+#define _POSIX_C_SOURCE 200809L
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * This is an example of BAD CODE!
+ * Can you use valgrind and gdb 
+ * to figure out what's wrong with it?
+ */
+
+
+int main() {
+    size_t size;
+    printf("How big?\n");
+    if (scanf("%zu", &size) != 1) {
+        abort();
+    }
+
+    int array[size];
+    for (size_t idx = 0; idx < size; idx++) {
+        array[idx] = 0;
+    }
+    
+    printf("%d\n", array[100]);
+    array[100] += 1;
+    printf("%d\n", array[100]);
+    return 0;
+}
+#+END_SRC
+
+
+Sanitize ./array_oob.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o array_oob ./array_oob.c
+echo 33 | ./array_oob 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: How big?
+: 32768
+: 32769
+
+We can see it didn't find any problem :(
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o array_oob ./array_oob.c
+echo 33 | ./array_oob 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: array_oob.c:26:25: runtime error: index 100 out of bounds for type 'int [*]'
+: array_oob.c:27:16: runtime error: index 100 out of bounds for type 'int [*]'
+: array_oob.c:28:25: runtime error: index 100 out of bounds for type 'int [*]'
+: How big?
+: -122012136
+: -122012135
+
+**** ./array_uninit.c
+file:./array_uninit.c
+
+Sanitize ./array_uninit.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o array_uninit ./array_uninit.c
+echo 33 | ./array_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+How big?
+8
+0
+1000749619
+32617
+1
+0
+1023072016
+32617
+1
+0
+8
+0
+1004291936
+32617
+-1601245024
+21908
+1004274336
+32617
+0
+0
+0
+0
+1000704655
+32617
+0
+0
+9369840
+32765
+9369984
+32765
+9369936
+32765
+-1609441506
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o array_uninit ./array_uninit.c
+echo 33 | ./array_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+How big?
+8
+0
+930196019
+32682
+0
+0
+0
+0
+0
+0
+8
+0
+933738336
+32682
+-1222128299
+22050
+933720736
+32682
+-1930578816
+32766
+0
+0
+930151055
+32682
+0
+0
+0
+0
+-1930578704
+32766
+-1222129152
+22050
+0
+How big?
+99898016
+0
+-16776688
+31
+0
+0
+96328335
+0
+0
+0
+0
+0
+-16776576
+31
+1083904
+0
+#+end_example
+
+**** ./bad_realloc.c
+file:./bad_realloc.c
+
+Sanitize ./bad_realloc.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o bad_realloc ./bad_realloc.c
+echo 33 | ./bad_realloc 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+ASAN:DEADLYSIGNAL
+=================================================================
+==15939==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x5616154750f5 bp 0x7ffd5d176160 sp 0x7ffd5d176130 T0)
+==15939==The signal is caused by a READ memory access.
+==15939==Hint: address points to the zero page.
+    #0 0x5616154750f4 in push bad_realloc.c:54
+    #1 0x5616154754b2 in push_input_lines bad_realloc.c:91
+    #2 0x561615475616 in main bad_realloc.c:111
+    #3 0x7f8313e6eb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #4 0x561615474c99 in _start (/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/bad_realloc+0xc99)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV bad_realloc.c:54 in push
+==15939==ABORTING
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o bad_realloc ./bad_realloc.c
+echo 33 | ./bad_realloc 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: it crashed
+
+**** ./bad_str.c
+file:./bad_str.c
+
+Sanitize ./bad_str.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o bad_str ./bad_str.c
+echo 33 | ./bad_str 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+=================================================================
+==15958==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 5 byte(s) in 1 object(s) allocated from:
+    #0 0x7f8b33a13b40 in __interceptor_malloc (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xdeb40)
+    #1 0x55a06d4e9a7b in main bad_str.c:15
+    #2 0x7f8b33565b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+SUMMARY: AddressSanitizer: 5 byte(s) leaked in 1 allocation(s).
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o bad_str ./bad_str.c
+echo 33 | ./bad_str 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: Enter a message:
+: You entered: 33
+
+**** ./double_free.c
+file:./double_free.c
+
+Sanitize ./double_free.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o double_free ./double_free.c
+echo 33 | ./double_free 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+=================================================================
+==15980==ERROR: AddressSanitizer: attempting double-free on 0x60d000000040 in thread T0:
+    #0 0x7f00fcd1e7a8 in __interceptor_free (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xde7a8)
+    #1 0x55cadbe8cffa in main double_free.c:27
+    #2 0x7f00fc870b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #3 0x55cadbe8cca9 in _start (/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/double_free+0xca9)
+
+0x60d000000040 is located 0 bytes inside of 132-byte region [0x60d000000040,0x60d0000000c4)
+freed by thread T0 here:
+    #0 0x7f00fcd1e7a8 in __interceptor_free (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xde7a8)
+    #1 0x55cadbe8cfeb in main double_free.c:26
+    #2 0x7f00fc870b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+previously allocated by thread T0 here:
+    #0 0x7f00fcd1eb40 in __interceptor_malloc (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xdeb40)
+    #1 0x55cadbe8ce7d in main double_free.c:21
+    #2 0x7f00fc870b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+SUMMARY: AddressSanitizer: double-free (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xde7a8) in __interceptor_free
+==15980==ABORTING
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o double_free ./double_free.c
+echo 33 | ./double_free 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+How big?
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+#+end_example
+
+**** ./huge_array.c
+file:./huge_array.c
+
+Sanitize ./huge_array.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o huge_array ./huge_array.c
+echo 33 | ./huge_array 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: 0
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o huge_array ./huge_array.c
+echo 33 | ./huge_array 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: 0
+
+
+**** ./malloc_oob.c
+file:./malloc_oob.c
+
+Sanitize ./malloc_oob.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o malloc_oob ./malloc_oob.c
+echo 33 | ./malloc_oob 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+=================================================================
+==16020==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x60d0000001d0 at pc 0x55add4c2afa2 bp 0x7ffdb22c6320 sp 0x7ffdb22c6310
+READ of size 4 at 0x60d0000001d0 thread T0
+    #0 0x55add4c2afa1 in main malloc_oob.c:26
+    #1 0x7fe0ad004b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #2 0x55add4c2aca9 in _start (/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/malloc_oob+0xca9)
+
+Address 0x60d0000001d0 is a wild pointer.
+SUMMARY: AddressSanitizer: heap-buffer-overflow malloc_oob.c:26 in main
+Shadow bytes around the buggy address:
+  0x0c1a7fff7fe0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff7ff0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff8000: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+  0x0c1a7fff8010: 00 00 00 00 00 00 00 00 04 fa fa fa fa fa fa fa
+  0x0c1a7fff8020: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+=>0x0c1a7fff8030: fa fa fa fa fa fa fa fa fa fa[fa]fa fa fa fa fa
+  0x0c1a7fff8040: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8050: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8060: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8070: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8080: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==16020==ABORTING
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o malloc_oob ./malloc_oob.c
+echo 33 | ./malloc_oob 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: How big?
+: 0
+
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -o malloc_oob ./malloc_oob.c 2>&1
+echo 33 | ./malloc_oob 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: gcc: error: -fsanitize=all option is not valid
+: How big?
+: 0
+
+
+**** ./malloc_uninit.c
+file:./malloc_uninit.c
+
+Sanitize ./malloc_uninit.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o malloc_uninit ./malloc_uninit.c
+echo 33 | ./malloc_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+=================================================================
+==16038==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 132 byte(s) in 1 object(s) allocated from:
+    #0 0x7f2b148e4b40 in __interceptor_malloc (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xdeb40)
+    #1 0x55718431addd in main malloc_uninit.c:23
+    #2 0x7f2b14436b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+SUMMARY: AddressSanitizer: 132 byte(s) leaked in 1 allocation(s).
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o malloc_uninit ./malloc_uninit.c
+echo 33 | ./malloc_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+How big?
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+0
+#+end_example
+
+**** ./segv.c
+file:./segv.c
+
+Sanitize ./segv.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o segv ./segv.c
+echo 33 | ./segv 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+ASAN:DEADLYSIGNAL
+=================================================================
+==16057==ERROR: AddressSanitizer: SEGV on unknown address 0x60d0003d0940 (pc 0x556a56a96fa2 bp 0x7ffe5787f9d0 sp 0x7ffe5787f910 T0)
+==16057==The signal is caused by a READ memory access.
+    #0 0x556a56a96fa1 in main segv.c:26
+    #1 0x7f5a0cb57b96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #2 0x556a56a96ca9 in _start (/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/segv+0xca9)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV segv.c:26 in main
+==16057==ABORTING
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o segv ./segv.c
+echo 33 | ./segv 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: it crashed
+
+**** ./simple_uninit.c
+file:./simple_uninit.c
+
+Sanitize ./simple_uninit.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o simple_uninit ./simple_uninit.c
+echo 33 | ./simple_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: Enter an int:
+: 33
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o simple_uninit ./simple_uninit.c
+echo 33 | ./simple_uninit 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+: Enter an int:
+: 33
+
+**** ./use_after_free.c
+file:./use_after_free.c
+
+Sanitize ./use_after_free.c with address!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o use_after_free ./use_after_free.c
+echo 33 | ./use_after_free 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+=================================================================
+==16205==ERROR: AddressSanitizer: heap-use-after-free on address 0x60d000000040 at pc 0x558b174990b8 bp 0x7fff8aa65040 sp 0x7fff8aa65030
+READ of size 4 at 0x60d000000040 thread T0
+    #0 0x558b174990b7 in main use_after_free.c:30
+    #1 0x7f6e97a6eb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+    #2 0x558b17498ca9 in _start (/home/hindle1/projects/CMPUT201W20/2020-01/CMPUT201W20B2-public/week10/use_after_free+0xca9)
+
+0x60d000000040 is located 0 bytes inside of 132-byte region [0x60d000000040,0x60d0000000c4)
+freed by thread T0 here:
+    #0 0x7f6e97f1c7a8 in __interceptor_free (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xde7a8)
+    #1 0x558b1749903c in main use_after_free.c:28
+    #2 0x7f6e97a6eb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+previously allocated by thread T0 here:
+    #0 0x7f6e97f1cb40 in __interceptor_malloc (/usr/lib/x86_64-linux-gnu/libasan.so.4+0xdeb40)
+    #1 0x558b17498e7e in main use_after_free.c:21
+    #2 0x7f6e97a6eb96 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x21b96)
+
+SUMMARY: AddressSanitizer: heap-use-after-free use_after_free.c:30 in main
+Shadow bytes around the buggy address:
+  0x0c1a7fff7fb0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff7fc0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff7fd0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff7fe0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x0c1a7fff7ff0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x0c1a7fff8000: fa fa fa fa fa fa fa fa[fd]fd fd fd fd fd fd fd
+  0x0c1a7fff8010: fd fd fd fd fd fd fd fd fd fa fa fa fa fa fa fa
+  0x0c1a7fff8020: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8030: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8040: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x0c1a7fff8050: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==16205==ABORTING
+it crashed
+#+end_example
+
+And now with undefined!
+#+BEGIN_SRC sh :exports both
+gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o use_after_free ./use_after_free.c
+echo 33 | ./use_after_free 2>&1 || echo it crashed
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+How big?
+array[0] = 0
+array[1] = 1
+array[2] = 2
+array[3] = 3
+array[4] = 4
+array[5] = 5
+array[6] = 6
+array[7] = 7
+array[8] = 8
+array[9] = 9
+array[10] = 10
+array[11] = 11
+array[12] = 12
+array[13] = 13
+array[14] = 14
+array[15] = 15
+array[16] = 16
+array[17] = 17
+array[18] = 18
+array[19] = 19
+array[20] = 20
+array[21] = 21
+array[22] = 22
+array[23] = 23
+array[24] = 24
+array[25] = 25
+array[26] = 26
+array[27] = 27
+array[28] = 28
+array[29] = 29
+array[30] = 30
+array[31] = 31
+array[32] = 32
+array[0] = 0
+array[1] = 0
+array[2] = 2
+array[3] = 3
+array[4] = 4
+array[5] = 5
+array[6] = 6
+array[7] = 7
+array[8] = 8
+array[9] = 9
+array[10] = 10
+array[11] = 11
+array[12] = 12
+array[13] = 13
+array[14] = 14
+array[15] = 15
+array[16] = 16
+array[17] = 17
+array[18] = 18
+array[19] = 19
+array[20] = 20
+array[21] = 21
+array[22] = 22
+array[23] = 23
+array[24] = 24
+array[25] = 25
+array[26] = 26
+array[27] = 27
+array[28] = 28
+array[29] = 29
+array[30] = 30
+array[31] = 31
+array[32] = 32
+#+end_example
+
+
+***** Generator (ignore)
+
+This is just code for me to generate part of the slides
+
+#+BEGIN_SRC sh :exports none :eval no :results raw
+# look a bash for loop!
+for file in ./array_oob.c ./array_uninit.c ./bad_realloc.c ./bad_str.c ./double_free.c ./huge_array.c ./malloc_oob.c ./malloc_uninit.c ./segv.c ./simple_uninit.c ./stack.c ./stack_limit.c ./use_after_free.c 
+#for file in ./array_oob.c ./array_uninit.c ./bad_realloc.c 
+do
+exe=`basename -s .c $file`
+echo
+echo \*\*\*\* $file
+echo file:$file
+echo 
+echo Sanitize $file with address!
+echo \#+BEGIN_SRC sh :exports both
+echo gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=address -o $exe $file
+echo echo 33 \| ./$exe 2\>\&1 \|\| echo it crashed
+echo \#+END_SRC
+echo 
+echo And now with undefined!
+echo \#+BEGIN_SRC sh :exports both
+echo gcc -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3 -fsanitize=undefined -o $exe $file
+echo echo 33 \| ./$exe 2\>\&1 \|\| echo it crashed
+echo \#+END_SRC
+
+done
+#+END_SRC
+
+#+RESULTS:
+
+

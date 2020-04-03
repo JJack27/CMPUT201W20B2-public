@@ -1,0 +1,51 @@
+# common arguments for GCC
+CFLAGS= -std=c99 -pedantic -Wall -Wextra -ftrapv -ggdb3
+# Common compiler
+CC=gcc
+# you might call these OBJECTS instead
+BUILDABLES=coolbears.o coolbears-driver
+# clangtidy checks
+CHECKS=--checks=*,-cert-err34-c,-cert-msc30-c,-cert-msc50-cpp
+# oclint checks
+LINTR=--disable-rule=UselessParentheses
+CLANGTIDY=clang-tidy
+OCLINT=oclint
+HEADERS=coolbears.h
+OBJECTS=coolbears.o coolbears-driver.o
+EXECUTABLE=coolbears-driver
+
+.PHONY: lint-% run clean valgrind
+
+# this just runs a command but ensures it is built
+run: $(EXECUTABLE)
+	./$(EXECUTABLE)
+
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< 
+	$(CLANGTIDY) $(CHECKS) \
+		$< -- \
+		$(CFLAGS) -c $< $(LDFLAGS)
+	$(OCLINT) $(LINTR) $< \
+		-- $(CFLAGS) -c $< $(LDFLAGS)
+
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+# clean is idiomatic for remove object files and executables
+clean: 
+	rm -f $(EXECUTABLE) $(OBJECTS) 
+
+lint-%: %.c
+	$(CLANGTIDY) $(CHECKS) \
+		$< -- \
+		$(CFLAGS) -c $< $(LDFLAGS)
+	$(OCLINT) $(LINTR) $< \
+		-- $(CFLAGS) -c $< $(LDFLAGS)
+
+# Lookie here how these 2 valgrinds are very similar
+valgrind-%: %
+	valgrind --leak-check=full --track-origins=yes ./$< 2>&1
+
+valgrind: $(EXECUTABLE)
+	valgrind --leak-check=full --track-origins=yes ./$< 2>&1
